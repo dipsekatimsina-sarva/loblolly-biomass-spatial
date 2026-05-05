@@ -179,8 +179,8 @@ Open `analysis.Rmd` in RStudio and knit, or run sections interactively. Data col
 ## Author
 
 **Dipseka Timsina**  
-Undergraduate Researcher, Michigan State University REU, Summer 2024  
-dipsekatimsina75@gmail.com | https://www.linkedin.com/in/dipsekatimsina/
+Undergraduate Researcher, Mississippi State University REU, Summer 2024  
+d[dipsekatimsina75@gmail.com](mailto:dipsekatimsina75@gmail.com) | [LinkedIn](https://www.linkedin.com/in/dipsekatimsina/)
 
 ---
 
