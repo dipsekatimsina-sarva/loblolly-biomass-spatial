@@ -1,0 +1,234 @@
+---
+title: "modifieddata"
+author: "Dipseka Timsina"
+date: "2024-07-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(DirichletReg)
+```
+
+```{r setup}
+updateddata <- read.csv("updateddata.csv", head=T)
+pinusdata <- updateddata %>%
+  select("spp", "dbh_cm", "tht_m", "stm_kg", "brk_kg", "bch_kg",
+         "fol_kg", "agb_kg", "lon", "lat")
+
+summary_table <-  pinusdata %>% group_by(spp) %>%
+  summarise_all(list(min = min, max = max, mean = mean, sd=sd))
+```
+
+```{r }
+PT <- pinusdata %>%
+  select("spp", "dbh_cm", "tht_m", "stm_kg", "brk_kg", 
+         "bch_kg", "fol_kg", "agb_kg", "lon", "lat") %>%
+  filter(spp == "Pinus taeda")
+```
+#
+# Dirichlet Regressions for estimating component biomass
+# The objective is to predict the proportion of biomass in each component simultaneously
+#
+
+# Calculate proportions: 
+```{r}
+PT$fol_kg = PT$fol_kg/PT$agb_kg
+PT$brk_kg = PT$brk_kg/PT$agb_kg
+PT$bch_kg = PT$bch_kg/PT$agb_kg
+PT$stm_kg = PT$stm_kg/PT$agb_kg
+```
+
+# Plot component proportions vs. DBH
+```{r}
+ggplot(PT) +
+        geom_point(aes(x=dbh_cm, y=fol_kg, color="Foliage")) +
+        geom_smooth(aes(x=dbh_cm, y=fol_kg, color="Foliage"), se=F) +
+        geom_point(aes(x=dbh_cm, y=bch_kg, color="Branch")) +
+        geom_smooth(aes(x=dbh_cm, y=bch_kg, color="Branch"), se=F) +
+        geom_point(aes(x=dbh_cm, y=brk_kg, color="Stembark")) +
+        geom_smooth(aes(x=dbh_cm, y=brk_kg, color="Stembark"), se=F) +
+        geom_point(aes(x=dbh_cm, y=stm_kg, color="Stemwood")) +
+        geom_smooth(aes(x=dbh_cm, y=stm_kg, color="Stemwood"), se=F) +
+        theme_bw() + theme(legend.title = element_blank()) +
+        xlab("Diameter at breast height (cm)") +
+        ylab("Component proportions")
+
+```
+# Plot component proportions vs. tht
+```{r}
+ggplot(PT) +
+        geom_point(aes(x=tht_m, y=fol_kg, color="Foliage")) +
+        geom_smooth(aes(x=tht_m, y=fol_kg, color="Foliage"), se=F) +
+        geom_point(aes(x=tht_m, y=bch_kg, color="Branch")) +
+        geom_smooth(aes(x=tht_m, y=bch_kg, color="Branch"), se=F) +
+        geom_point(aes(x=tht_m, y=brk_kg, color="Stembark")) +
+        geom_smooth(aes(x=tht_m, y=brk_kg, color="Stembark"), se=F) +
+        geom_point(aes(x=tht_m, y=stm_kg, color="Stemwood")) +
+        geom_smooth(aes(x=tht_m, y=stm_kg, color="Stemwood"), se=F) +
+        theme_bw() + theme(legend.title = element_blank()) +
+        xlab("Total tree height (m)") +
+        ylab("Component proportions")
+```
+
+# Format data for Dirichlet Regression
+
+# Our Y values are in columns 4 - 7: 
+```{r}
+PT$Y = DR_data(PT[,4:7])
+diri0 = DirichReg(Y ~ dbh_cm + tht_m, data=PT, model="alternative")
+summary(diri0) 
+```
+
+# Add latitude and longitude in the model:
+```{r}
+diri1 = DirichReg(Y ~ dbh_cm + tht_m + lat + lon, data=PT, model="alternative")
+summary(diri1)
+```
+
+# Compute fitted values:
+```{r}
+PT$pstm_kg = fitted(diri1)[,"stm_kg"]
+PT$pbrk_kg = fitted(diri1)[,"brk_kg"]
+PT$pbch_kg = fitted(diri1)[,"bch_kg"]
+PT$pfol_kg = fitted(diri1)[,"fol_kg"]
+```
+
+# Plot Observed Vs. Predicted Component Biomass Proportions      
+```{r}
+op = par(oma=c(3,3,0,0), mar=c(3,3,2,2), mfrow=c(2,2))
+plot(PT$stm_kg, PT$pstm_kg, font.main=1,
+     main="Stem wood Biomass", pch=20); abline(0,1)
+plot(PT$brk_kg, PT$pbrk_kg, font.main=1,
+     main="Stem bark biomass", pch=20); abline(0,1)
+plot(PT$bch_kg, PT$pbch_kg, font.main=1,
+     main="Branch biomass", pch=20); abline(0,1)
+plot(PT$fol_kg, PT$pfol_kg, font.main=1,
+     main="Foilage biomass", pch=20); abline(0,1)
+mtext(text="Observed proportion", side=1, line=0, outer=TRUE)
+mtext(text="Predicted proportion", side=2, line=0, outer=TRUE)
+par(op)
+```
+
+```{r}
+anova(diri1, diri0)
+```
+
+
+
+# Fitted values at mean DBH, THT and LON with varying latitude
+```{r}
+newdat = PT
+newdat$tht_m = mean(PT$tht_m)
+newdat$dbh_cm = mean(PT$dbh_cm)
+newdat$lon = mean(PT$lon)
+
+newdat$stm1 = predict(diri1, newdata=newdat)[,1]
+newdat$brk1 = predict(diri1, newdata=newdat)[,2]
+newdat$bch1 = predict(diri1, newdata=newdat)[,3]
+newdat$fol1 = predict(diri1, newdata=newdat)[,4]
+```
+
+# Plot
+```{r}
+ggplot(newdat) +
+        geom_smooth(aes(x=lat, y=fol1, color="Foliage")) +
+        geom_smooth(aes(x=lat, y=bch1, color="Branch")) +
+        geom_smooth(aes(x=lat, y=brk1, color="Stembark")) +
+        geom_smooth(aes(x=lat, y=stm1, color="Stemwood")) +
+        theme_bw() + theme(legend.title = element_blank()) +
+        xlab("Latitude") +
+        ylab("Component proportions")
+```
+
+#ggsave("DiriPlot.tiff")
+
+# Fitted values at mean DBH, THT, and LAT with varying longitude
+```{r}
+newdat = PT
+newdat$tht_m = mean(PT$tht_m)
+newdat$dbh_cm = mean(PT$dbh_cm)
+newdat$lat = mean(PT$lat)
+
+newdat$stm1 = predict(diri1, newdata=newdat)[,1]
+newdat$brk1 = predict(diri1, newdata=newdat)[,2]
+newdat$bch1 = predict(diri1, newdata=newdat)[,3]
+newdat$fol1 = predict(diri1, newdata=newdat)[,4]
+```
+
+# Plot
+
+```{r}
+ggplot(newdat) +
+        geom_smooth(aes(x=lon, y=fol1, color="Foliage")) +
+        geom_smooth(aes(x=lon, y=bch1, color="Branch")) +
+        geom_smooth(aes(x=lon, y=brk1, color="Stembark")) +
+        geom_smooth(aes(x=lon, y=stm1, color="Stemwood")) +
+        theme_bw() + theme(legend.title = element_blank()) +
+        xlab("Longitude") +
+        ylab("Component proportions")
+```
+
+# Diagnostic plots:
+```{r}
+op = par(oma=c(3,3,0,0), mar=c(3,3,2,2), mfrow=c(2,2))
+plot(fitted(diri1)[,1],
+     residuals(diri1, type="standardized")[,1],
+     main = "Stemwood")
+plot(fitted(diri1)[,2],
+     residuals(diri1, type="standardized")[,2],
+     main = "Stembark")
+plot(fitted(diri1)[,3], 
+     residuals(diri1, type="standardized")[,3],
+     main = "Branch")
+plot(fitted(diri1)[,4], 
+     residuals(diri1, type="standardized")[,4],
+     main = "Foliage")
+mtext(text="Fitted values", side=1, line=0, outer=TRUE)
+mtext(text="Standardized residuals", side=2, line=0, outer=TRUE)
+par(op)
+```
+
+```{r calculate RMSE}
+#sqrt(mean((PT$Y[,"stm_kg"]-PT$pstm_kg)^2))
+#install.packages("Metrics")
+#library(Metrics)
+rmse_stm <- rmse(PT$Y[,"stm_kg"],PT$pstm_kg)
+rmse_brk <- rmse(PT$Y[,"brk_kg"],PT$pbrk_kg)
+rmse_bch <- rmse(PT$Y[,"bch_kg"],PT$pbch_kg)
+rmse_fol <- rmse(PT$Y[,"fol_kg"],PT$pfol_kg)
+```
+
+```{r comparing RMSE from model0&1}
+rmse_stm0 <- rmse(PT$Y[,"stm_kg"], fitted(diri0)[,"stm_kg"])
+rmse_brk0 <- rmse(PT$Y[,"brk_kg"], fitted(diri0)[,"brk_kg"])
+rmse_bch0 <- rmse(PT$Y[,"bch_kg"], fitted(diri0)[,"bch_kg"])
+rmse_fol0 <- rmse(PT$Y[,"fol_kg"], fitted(diri0)[,"fol_kg"])
+
+rmse_stm1 <- rmse(PT$Y[,"stm_kg"], fitted(diri1)[,"stm_kg"])
+rmse_brk1 <- rmse(PT$Y[,"brk_kg"], fitted(diri1)[,"brk_kg"])
+rmse_bch1 <- rmse(PT$Y[,"bch_kg"], fitted(diri1)[,"bch_kg"])
+rmse_fol1 <- rmse(PT$Y[,"fol_kg"], fitted(diri1)[,"fol_kg"])
+```
+
+```{r map}
+
+library(ggplot2)
+#install.packages("maps")
+library(maps)
+
+
+states <- map_data("state")
+
+ggplot() +
+  geom_polygon(data = states, aes(x = long, y = lat, group = group), 
+               fill = "lightgreen", color = "black") +
+  geom_point(data = PT, aes(x = lon, y = lat), color = "darkgreen", size = 3) +
+  labs(title = "Loblolly Pine") +
+  xlab("Longitude") +
+  ylab("Latitude") + 
+  theme_minimal()
+
+```
+
