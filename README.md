@@ -180,7 +180,7 @@ Open `analysis.Rmd` in RStudio and knit, or run sections interactively. Data col
 
 **Dipseka Timsina**  
 Undergraduate Researcher, Michigan State University REU, Summer 2024  
-[your.email@example.com] | [LinkedIn URL]
+dipsekatimsina75@gmail.com | https://www.linkedin.com/in/dipsekatimsina/
 
 ---
 
