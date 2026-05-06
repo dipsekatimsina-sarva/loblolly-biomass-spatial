@@ -146,8 +146,7 @@ loblolly-biomass-spatial/
 │   ├── fig_height.png
 │   ├── fig_latitude.png
 │   └── fig_map.png
-├── data/
-│   └── updateddata.csv
+├── updateddata.csv
 ├── analysis.Rmd
 └── README.md
 ```
